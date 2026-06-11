@@ -4,6 +4,8 @@
 
 建议文件：
 
+- `MOM智能问数项目方案.md`
+- `MOM智能问数项目方案.pdf`
 - `problem-statement.md`
 - `value-hypothesis.md`
 - `terms.md`
