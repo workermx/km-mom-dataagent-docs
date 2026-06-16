@@ -1,0 +1,1225 @@
+
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KM-MOM DataAgent - 用户侧原型</title>
+  <style>
+    :root {
+      --bg: #FAFAFA;
+      --fg: #111111;
+      --surface: #FFFFFF;
+      --muted: #6B6B6B;
+      --border: #E5E5E5;
+      --accent: #2F6FEB;
+      --success: #17A34A;
+      --danger: #DC2626;
+      --sidebar: #F4F7FC;
+      --sidebar-strong: #EAF1FF;
+      --input-shadow: 0 2px 8px rgba(17, 17, 17, 0.08);
+      --font-display: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --font-body: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --sidebar-width: 288px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    body { overflow: hidden; }
+
+    button,
+    textarea { font: inherit; }
+
+    button { cursor: pointer; }
+
+    svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+      flex: 0 0 auto;
+    }
+
+    .app-shell {
+      width: 100vw;
+      height: 100dvh;
+      min-height: 720px;
+      display: grid;
+      grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+      background: var(--bg);
+      transition: grid-template-columns 180ms ease;
+    }
+
+    .app-shell.is-collapsed { --sidebar-width: 76px; }
+
+    .sidebar {
+      height: 100dvh;
+      min-height: 720px;
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 18px 14px;
+      gap: 16px;
+      min-width: 0;
+    }
+
+    .brand-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 34px;
+      align-items: center;
+      gap: 10px;
+      min-height: 48px;
+    }
+
+    .brand-name {
+      min-width: 0;
+      font-family: var(--font-display);
+      font-weight: 600;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      color: var(--fg);
+    }
+
+    .brand-name span {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .brand-name span:first-child { font-size: 19px; }
+
+    .brand-name span:last-child {
+      margin-top: 2px;
+      font-size: 17px;
+      color: color-mix(in srgb, var(--fg) 82%, var(--muted));
+    }
+
+    .collapse-button {
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: var(--surface);
+      color: var(--muted);
+      padding: 0;
+      transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+    }
+
+    .collapse-button:hover {
+      color: var(--accent);
+      border-color: color-mix(in srgb, var(--accent) 36%, var(--border));
+      background: #FFFFFF;
+    }
+
+    .app-shell.is-collapsed .brand-row {
+      grid-template-columns: 1fr;
+      justify-items: center;
+      min-height: 40px;
+    }
+
+    .app-shell.is-collapsed .brand-name { display: none; }
+
+    .app-shell.is-collapsed .collapse-button {
+      display: grid;
+      width: 46px;
+      height: 42px;
+    }
+
+    .app-shell.is-collapsed .collapse-button svg { transform: rotate(180deg); }
+
+    .sidebar-actions {
+      display: grid;
+      gap: 10px;
+    }
+
+    .btn {
+      min-height: 42px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      padding: 10px 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #FFFFFF;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--fg);
+      border-color: var(--border);
+    }
+
+    .btn-secondary:hover {
+      color: var(--accent);
+      border-color: color-mix(in srgb, var(--accent) 36%, var(--border));
+      background: var(--surface);
+    }
+
+    .app-shell.is-collapsed .sidebar {
+      padding-left: 14px;
+      padding-right: 14px;
+      align-items: center;
+    }
+
+    .app-shell.is-collapsed .sidebar-actions {
+      width: 100%;
+      gap: 12px;
+    }
+
+    .app-shell.is-collapsed .btn {
+      width: 46px;
+      height: 42px;
+      padding: 0;
+      margin: 0 auto;
+    }
+
+    .app-shell.is-collapsed .btn-label {
+      display: none;
+    }
+
+    .history-block {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+      padding-top: 2px;
+    }
+
+    .history-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .history-list {
+      min-height: 0;
+      overflow-y: auto;
+      display: grid;
+      gap: 6px;
+      padding-right: 2px;
+    }
+
+    .history-list::-webkit-scrollbar { width: 8px; }
+
+    .history-list::-webkit-scrollbar-thumb {
+      background: #D6DDE8;
+      border-radius: 999px;
+    }
+
+    .session-item {
+      position: relative;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 10px 8px 10px 10px;
+      background: transparent;
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      color: var(--fg);
+      min-height: 58px;
+      transition: background 160ms ease, border-color 160ms ease;
+    }
+
+    .session-item:hover { background: rgba(255, 255, 255, 0.72); }
+
+    .session-item.is-active {
+      background: var(--sidebar-strong);
+      border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
+    }
+
+    .session-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      background: var(--surface);
+      color: var(--muted);
+    }
+
+    .session-item.is-active .session-icon {
+      color: var(--accent);
+      border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+    }
+
+    .session-content {
+      min-width: 0;
+      display: grid;
+      gap: 2px;
+    }
+
+    .session-title {
+      font-size: 14px;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .session-time {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .session-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      opacity: 0;
+      transform: translateX(2px);
+      transition: opacity 140ms ease, transform 140ms ease;
+    }
+
+    .session-item:hover .session-actions,
+    .session-item:focus-within .session-actions,
+    .session-item.is-active .session-actions {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .session-action {
+      width: 26px;
+      height: 26px;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      display: grid;
+      place-items: center;
+      background: transparent;
+      color: var(--muted);
+      padding: 0;
+    }
+
+    .session-action svg {
+      width: 15px;
+      height: 15px;
+    }
+
+    .session-action:hover {
+      background: var(--surface);
+      border-color: var(--border);
+      color: var(--accent);
+    }
+
+    .session-action.delete:hover {
+      color: var(--danger);
+      border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+      background: color-mix(in srgb, var(--danger) 6%, white);
+    }
+
+    .sidebar-footnote {
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .app-shell.is-collapsed .history-block,
+    .app-shell.is-collapsed .sidebar-footnote {
+      display: none;
+    }
+
+    .main {
+      height: 100dvh;
+      min-height: 720px;
+      min-width: 0;
+      display: grid;
+      grid-template-rows: 64px minmax(0, 1fr) auto;
+      background: var(--bg);
+    }
+
+    .topbar {
+      height: 64px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+    }
+
+    .conversation-title h1 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 20px;
+      line-height: 1.2;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .top-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+    }
+
+    .chat-canvas {
+      min-height: 0;
+      overflow: auto;
+      padding: 56px 32px 32px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .chat-inner {
+      width: min(860px, 100%);
+      min-height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .empty-state {
+      width: 100%;
+      display: grid;
+      justify-items: center;
+      gap: 24px;
+      transform: translateY(-28px);
+    }
+
+    .empty-icon {
+      width: 56px;
+      height: 56px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+      color: var(--accent);
+      display: grid;
+      place-items: center;
+    }
+
+    .welcome-copy {
+      display: grid;
+      justify-items: center;
+      gap: 8px;
+      text-align: center;
+    }
+
+    .welcome-copy h2 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 32px;
+      line-height: 1.2;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .welcome-copy p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .suggestions {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .suggestion-card {
+      min-height: 112px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      padding: 16px;
+      display: grid;
+      align-content: space-between;
+      gap: 14px;
+      text-align: left;
+      color: inherit;
+      transition: border-color 160ms ease, transform 160ms ease;
+    }
+
+    .suggestion-card:hover {
+      border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+      transform: translateY(-1px);
+    }
+
+    .suggestion-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .suggestion-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .suggestion-badge {
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 7%, white);
+    }
+
+    .suggestion-badge svg,
+    .suggestion-top svg { width: 15px; height: 15px; }
+
+    .suggestion-card strong {
+      color: var(--fg);
+      font-size: 15px;
+      line-height: 1.45;
+      font-weight: 600;
+    }
+
+    .input-dock {
+      border-top: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg) 92%, var(--surface));
+      padding: 18px 32px 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .composer {
+      width: min(920px, 100%);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--input-shadow);
+      padding: 10px 10px 10px 16px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: end;
+      gap: 8px;
+    }
+
+    .composer:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent), var(--input-shadow);
+    }
+
+    .composer textarea {
+      width: 100%;
+      min-height: 44px;
+      max-height: 112px;
+      resize: none;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--fg);
+      padding: 10px 0;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .composer textarea::placeholder {
+      color: color-mix(in srgb, var(--muted) 78%, white);
+    }
+
+    .icon-button {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      display: grid;
+      place-items: center;
+      position: relative;
+    }
+
+    .icon-button:hover {
+      color: var(--accent);
+      border-color: color-mix(in srgb, var(--accent) 36%, var(--border));
+    }
+
+    .tooltip {
+      position: absolute;
+      left: 50%;
+      bottom: 48px;
+      transform: translateX(-50%);
+      padding: 5px 8px;
+      border-radius: 6px;
+      background: rgba(17, 17, 17, 0.84);
+      color: #FFFFFF;
+      font-size: 12px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 140ms ease;
+      z-index: 10;
+    }
+
+    .icon-button:hover .tooltip,
+    .session-action:hover .tooltip {
+      opacity: 1;
+    }
+
+    .send-button {
+      width: 40px;
+      height: 40px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: color-mix(in srgb, var(--accent) 18%, white);
+      color: color-mix(in srgb, var(--accent) 70%, var(--muted));
+    }
+
+    .send-button.is-ready {
+      background: var(--accent);
+      color: #FFFFFF;
+    }
+
+    .send-button:disabled { cursor: not-allowed; }
+
+    @media (max-width: 900px) {
+      body { overflow: auto; }
+
+      .app-shell,
+      .app-shell.is-collapsed {
+        min-height: 100dvh;
+        height: auto;
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        height: auto;
+        min-height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        align-items: stretch;
+      }
+
+      .app-shell.is-collapsed .brand-row {
+        grid-template-columns: minmax(0, 1fr) 34px;
+        justify-items: stretch;
+      }
+
+      .app-shell.is-collapsed .brand-name,
+      .app-shell.is-collapsed .history-block,
+      .app-shell.is-collapsed .sidebar-footnote,
+      .app-shell.is-collapsed .btn-label {
+        display: initial;
+      }
+
+      .app-shell.is-collapsed .btn {
+        width: auto;
+        padding: 10px 14px;
+        margin: 0;
+      }
+
+      .history-list { max-height: 260px; }
+
+      .main {
+        height: auto;
+        min-height: 680px;
+      }
+
+      .topbar { padding: 0 20px; }
+
+      .chat-canvas { padding: 40px 20px 24px; }
+
+      .suggestions { grid-template-columns: 1fr; }
+
+      .input-dock {
+        position: sticky;
+        bottom: 0;
+        padding: 14px 16px 18px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .welcome-copy h2 { font-size: 24px; }
+
+      .top-meta { display: none; }
+
+      .composer { border-radius: 14px; }
+
+      .session-item {
+        grid-template-columns: 28px minmax(0, 1fr);
+      }
+
+      .session-actions {
+        grid-column: 2;
+        opacity: 1;
+        justify-self: start;
+      }
+    }
+  
+    .conversation-messages {
+      width: 100%;
+      display: grid;
+      gap: 14px;
+      align-self: stretch;
+      align-content: start;
+      padding: 8px 0 24px;
+    }
+
+    .message-row {
+      display: grid;
+      gap: 6px;
+      max-width: min(620px, 88%);
+    }
+
+    .message-row.user {
+      justify-self: end;
+      justify-items: end;
+    }
+
+    .message-row.assistant {
+      justify-self: start;
+      justify-items: start;
+    }
+
+    .message-role {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .message-bubble {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: var(--surface);
+      color: var(--fg);
+      box-shadow: 0 2px 8px rgba(17, 17, 17, 0.05);
+    }
+
+    .message-row.user .message-bubble {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #FFFFFF;
+    }
+
+    .session-item.is-pinned .session-title::before {
+      content: "置顶 ";
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    a.btn { text-decoration: none; }
+    a.btn-primary { color: #FFFFFF; }
+  </style>
+</head>
+<body>
+  <main id="appShell" class="app-shell" aria-label="KM-MOM DataAgent 用户侧 Chat 页面">
+    <aside class="sidebar" aria-label="会话显示栏">
+      <div class="brand-row">
+        <div class="brand-name" aria-label="KM-MOM DataAgent">
+          <span>KM-MOM</span>
+          <span>DataAgent</span>
+        </div>
+        <button id="collapseButton" class="collapse-button" type="button" aria-label="收起侧边栏" aria-expanded="true" title="收起侧边栏">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="sidebar-actions">
+        <button class="btn btn-primary" type="button" title="新会话" aria-label="新会话">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span class="btn-label">新会话</span>
+        </button>
+        <a class="btn btn-secondary" href="admin.html#model" title="智能体配置" aria-label="智能体配置">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 6.5h16M4 12h16M4 17.5h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M17 16l1.5 1.5L21 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="btn-label">智能体配置</span>
+        </a>
+      </div>
+
+      <section class="history-block" aria-label="历史会话">
+        <div class="history-header">
+          <span>历史会话</span>
+        </div>
+
+        <div class="history-list">
+          <article class="session-item is-active" aria-current="true" title="新会话">
+            <div class="session-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="session-content">
+              <div class="session-title">新会话</div>
+              <div class="session-time">刚刚创建</div>
+            </div>
+            <div class="session-actions" aria-label="会话操作">
+              <button class="session-action" type="button" aria-label="重命名" title="重命名">
+                <span class="tooltip" role="tooltip">重命名</span>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 19h4l10-10a2.4 2.4 0 0 0-3.4-3.4L5.6 15.6 5 19Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                  <path d="M14 7l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+              </button>
+              <button class="session-action" type="button" aria-label="置顶" title="置顶">
+                <span class="tooltip" role="tooltip">置顶</span>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M8 5h8l-1 6 3 3v2H6v-2l3-3-1-6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                  <path d="M12 16v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+              </button>
+              <button class="session-action delete" type="button" aria-label="删除" title="删除">
+                <span class="tooltip" role="tooltip">删除</span>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M6 7h12M10 7V5h4v2M8 10v9h8v-9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          </article>
+
+          <article class="session-item" title="工单状态统计">
+            <div class="session-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M7 7h10M7 12h10M7 17h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="session-content">
+              <div class="session-title">工单状态统计</div>
+              <div class="session-time">今天 10:24</div>
+            </div>
+            <div class="session-actions" aria-label="会话操作">
+              <button class="session-action" type="button" aria-label="重命名" title="重命名"><svg viewBox="0 0 24 24" fill="none"><path d="M5 19h4l10-10a2.4 2.4 0 0 0-3.4-3.4L5.6 15.6 5 19Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 7l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+              <button class="session-action" type="button" aria-label="置顶" title="置顶"><svg viewBox="0 0 24 24" fill="none"><path d="M8 5h8l-1 6 3 3v2H6v-2l3-3-1-6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 16v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+              <button class="session-action delete" type="button" aria-label="删除" title="删除"><svg viewBox="0 0 24 24" fill="none"><path d="M6 7h12M10 7V5h4v2M8 10v9h8v-9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+          </article>
+
+          <article class="session-item" title="缺料风险分析">
+            <div class="session-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 4l8 15H4L12 4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                <path d="M12 9v4M12 16h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="session-content">
+              <div class="session-title">缺料风险分析</div>
+              <div class="session-time">昨天 16:40</div>
+            </div>
+            <div class="session-actions" aria-label="会话操作">
+              <button class="session-action" type="button" aria-label="重命名" title="重命名"><svg viewBox="0 0 24 24" fill="none"><path d="M5 19h4l10-10a2.4 2.4 0 0 0-3.4-3.4L5.6 15.6 5 19Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 7l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+              <button class="session-action" type="button" aria-label="置顶" title="置顶"><svg viewBox="0 0 24 24" fill="none"><path d="M8 5h8l-1 6 3 3v2H6v-2l3-3-1-6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 16v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+              <button class="session-action delete" type="button" aria-label="删除" title="删除"><svg viewBox="0 0 24 24" fill="none"><path d="M6 7h12M10 7V5h4v2M8 10v9h8v-9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+          </article>
+
+          <article class="session-item" title="仓库库存查询">
+            <div class="session-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M4 9l8-4 8 4-8 4-8-4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                <path d="M4 9v6l8 4 8-4V9" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="session-content">
+              <div class="session-title">仓库库存查询</div>
+              <div class="session-time">昨天 09:18</div>
+            </div>
+            <div class="session-actions" aria-label="会话操作">
+              <button class="session-action" type="button" aria-label="重命名" title="重命名"><svg viewBox="0 0 24 24" fill="none"><path d="M5 19h4l10-10a2.4 2.4 0 0 0-3.4-3.4L5.6 15.6 5 19Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 7l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+              <button class="session-action" type="button" aria-label="置顶" title="置顶"><svg viewBox="0 0 24 24" fill="none"><path d="M8 5h8l-1 6 3 3v2H6v-2l3-3-1-6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 16v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+              <button class="session-action delete" type="button" aria-label="删除" title="删除"><svg viewBox="0 0 24 24" fill="none"><path d="M6 7h12M10 7V5h4v2M8 10v9h8v-9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+          </article>
+
+          <article class="session-item" title="设备停机时长">
+            <div class="session-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" stroke="currentColor" stroke-width="1.6"/>
+              </svg>
+            </div>
+            <div class="session-content">
+              <div class="session-title">设备停机时长</div>
+              <div class="session-time">周二 14:05</div>
+            </div>
+            <div class="session-actions" aria-label="会话操作">
+              <button class="session-action" type="button" aria-label="重命名" title="重命名"><svg viewBox="0 0 24 24" fill="none"><path d="M5 19h4l10-10a2.4 2.4 0 0 0-3.4-3.4L5.6 15.6 5 19Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 7l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+              <button class="session-action" type="button" aria-label="置顶" title="置顶"><svg viewBox="0 0 24 24" fill="none"><path d="M8 5h8l-1 6 3 3v2H6v-2l3-3-1-6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 16v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+              <button class="session-action delete" type="button" aria-label="删除" title="删除"><svg viewBox="0 0 24 24" fill="none"><path d="M6 7h12M10 7V5h4v2M8 10v9h8v-9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+    </aside>
+
+    <section class="main" aria-label="主问数区域">
+      <header class="topbar">
+        <div class="conversation-title">
+          <h1>新会话</h1>
+        </div>
+        <div class="top-meta">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span>用户侧自然语言问数</span>
+        </div>
+      </header>
+
+      <section class="chat-canvas" aria-label="对话消息区">
+        <div class="chat-inner">
+          <div class="empty-state">
+            <div class="empty-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M6 8h12M6 12h8M6 16h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M4.5 4.5h15a2 2 0 0 1 2 2v9.8a2 2 0 0 1-2 2H10l-4.2 2.8v-2.8H4.5a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+              </svg>
+            </div>
+
+            <div class="welcome-copy">
+              <h2>请输入你想查询的 MOM 业务问题</h2>
+              <p>从工单、库存、设备、生产进度等业务问题开始。</p>
+            </div>
+
+            <div class="suggestions" aria-label="推荐问题">
+              <button class="suggestion-card" type="button">
+                <span class="suggestion-top">
+                  <span class="suggestion-label">
+                    <span class="suggestion-badge" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none">
+                        <path d="M7 7h10M7 12h10M7 17h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                      </svg>
+                    </span>
+                    工单
+                  </span>
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </span>
+                <strong>按工单状态统计当前工单数量</strong>
+              </button>
+
+              <button class="suggestion-card" type="button">
+                <span class="suggestion-top">
+                  <span class="suggestion-label">
+                    <span class="suggestion-badge" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none">
+                        <path d="M4 9l8-4 8 4-8 4-8-4Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                        <path d="M4 9v6l8 4 8-4V9" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                      </svg>
+                    </span>
+                    库存
+                  </span>
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </span>
+                <strong>查询低于安全库存的物料</strong>
+              </button>
+
+              <button class="suggestion-card" type="button">
+                <span class="suggestion-top">
+                  <span class="suggestion-label">
+                    <span class="suggestion-badge" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none">
+                        <path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                        <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" stroke="currentColor" stroke-width="1.5"/>
+                      </svg>
+                    </span>
+                    设备
+                  </span>
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </span>
+                <strong>分析设备停机时长</strong>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="input-dock" aria-label="输入区域">
+        <div class="composer">
+          <textarea id="questionInput" rows="1" placeholder="请输入你的问题，例如：按工单状态统计当前工单数量" aria-label="请输入你的问题"></textarea>
+          <button class="icon-button" type="button" aria-label="语音输入">
+            <span class="tooltip" role="tooltip">语音输入</span>
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Z" stroke="currentColor" stroke-width="1.8"/>
+              <path d="M19 11a7 7 0 0 1-14 0M12 18v3M9 21h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button id="sendButton" class="send-button" type="button" aria-label="发送问题" disabled>
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </footer>
+    </section>
+  </main>
+
+  <script>
+    const appShell = document.getElementById('appShell');
+    const collapseButton = document.getElementById('collapseButton');
+    const newSessionButton = document.querySelector('.sidebar-actions .btn-primary');
+    const historyList = document.querySelector('.history-list');
+    const chatInner = document.querySelector('.chat-inner');
+    const conversationTitle = document.querySelector('.conversation-title h1');
+    const input = document.getElementById('questionInput');
+    const sendButton = document.getElementById('sendButton');
+    const emptyStateTemplate = chatInner.innerHTML;
+    let activeSessionId = '';
+    let newSessionIndex = 1;
+
+    collapseButton.addEventListener('click', () => {
+      const collapsed = appShell.classList.toggle('is-collapsed');
+      collapseButton.setAttribute('aria-expanded', String(!collapsed));
+      collapseButton.setAttribute('aria-label', collapsed ? '展开侧边栏' : '收起侧边栏');
+      collapseButton.setAttribute('title', collapsed ? '展开侧边栏' : '收起侧边栏');
+    });
+
+    const actionIcons = {
+      rename: '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 19h4l10-10a2.4 2.4 0 0 0-3.4-3.4L5.6 15.6 5 19Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 7l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+      pin: '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 5h8l-1 6 3 3v2H6v-2l3-3-1-6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 16v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+      delete: '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 7h12M10 7V5h4v2M8 10v9h8v-9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    };
+
+    const defaultIcon = '<svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
+
+    const sessions = Array.from(historyList.querySelectorAll('.session-item')).map((item, index) => {
+      const title = item.querySelector('.session-title')?.textContent.trim() || item.getAttribute('title') || '新会话';
+      const time = item.querySelector('.session-time')?.textContent.trim() || '刚刚创建';
+      const icon = item.querySelector('.session-icon')?.innerHTML.trim() || defaultIcon;
+
+      return {
+        id: `session-${index + 1}`,
+        title,
+        time,
+        icon,
+        pinned: false,
+        messages: makeFakeMessages(title)
+      };
+    });
+
+    function makeFakeMessages(title) {
+      if (title === '新会话') {
+        return [];
+      }
+
+      return [
+        { role: 'user', text: title },
+        { role: 'assistant', text: `已根据“${title}”生成一段示例对话。这里后续可以替换为真实问数返回内容。` },
+        { role: 'assistant', text: '结果区域可以展示查询摘要、关键指标和图表占位。' }
+      ];
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[char]));
+    }
+
+    function renderHistory() {
+      historyList.innerHTML = sessions.map((session) => `
+        <article class="session-item ${session.id === activeSessionId ? 'is-active' : ''} ${session.pinned ? 'is-pinned' : ''}" title="${escapeHtml(session.title)}" data-session-id="${session.id}" ${session.id === activeSessionId ? 'aria-current="true"' : ''}>
+          <div class="session-icon" aria-hidden="true">${session.icon}</div>
+          <div class="session-content">
+            <div class="session-title">${escapeHtml(session.title)}</div>
+            <div class="session-time">${escapeHtml(session.time)}</div>
+          </div>
+          <div class="session-actions" aria-label="会话操作">
+            <button class="session-action" type="button" aria-label="重命名" title="重命名" data-action="rename">${actionIcons.rename}</button>
+            <button class="session-action" type="button" aria-label="${session.pinned ? '取消置顶' : '置顶'}" title="${session.pinned ? '取消置顶' : '置顶'}" data-action="pin">${actionIcons.pin}</button>
+            <button class="session-action delete" type="button" aria-label="删除" title="删除" data-action="delete">${actionIcons.delete}</button>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function renderConversation(session) {
+      conversationTitle.textContent = session.title;
+
+      if (!session.messages.length) {
+        chatInner.innerHTML = emptyStateTemplate;
+        return;
+      }
+
+      chatInner.innerHTML = `
+        <div class="conversation-messages" aria-label="${escapeHtml(session.title)} 对话内容">
+          ${session.messages.map((message) => `
+            <div class="message-row ${message.role}">
+              <div class="message-role">${message.role === 'user' ? '你' : 'DataAgent'}</div>
+              <div class="message-bubble">${escapeHtml(message.text)}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function activateSession(id) {
+      const session = sessions.find((item) => item.id === id);
+      if (!session) return;
+      activeSessionId = id;
+      renderHistory();
+      renderConversation(session);
+    }
+
+    function renameSession(session) {
+      const nextTitle = window.prompt('修改会话标题', session.title);
+      if (!nextTitle || nextTitle.trim() === session.title) return;
+      session.title = nextTitle.trim();
+      session.messages = makeFakeMessages(session.title);
+      activateSession(session.id);
+    }
+
+    function togglePinSession(session) {
+      session.pinned = !session.pinned;
+      const index = sessions.findIndex((item) => item.id === session.id);
+      if (session.pinned && index > -1) {
+        sessions.splice(index, 1);
+        sessions.unshift(session);
+      }
+      activateSession(session.id);
+    }
+
+    function deleteSession(session) {
+      const index = sessions.findIndex((item) => item.id === session.id);
+      if (index === -1) return;
+      sessions.splice(index, 1);
+
+      if (!sessions.length) {
+        createNewSession();
+        return;
+      }
+
+      activateSession(sessions[Math.min(index, sessions.length - 1)].id);
+    }
+
+    function createNewSession() {
+      const session = {
+        id: `session-new-${Date.now()}`,
+        title: newSessionIndex === 1 ? '新会话' : `新会话 ${newSessionIndex}`,
+        time: '刚刚创建',
+        icon: defaultIcon,
+        pinned: false,
+        messages: []
+      };
+      newSessionIndex += 1;
+      sessions.unshift(session);
+      activateSession(session.id);
+    }
+
+    function sendFakeMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+
+      let session = sessions.find((item) => item.id === activeSessionId);
+      if (!session) {
+        createNewSession();
+        session = sessions.find((item) => item.id === activeSessionId);
+      }
+      if (!session) return;
+
+      session.messages.push({ role: 'user', text });
+      session.messages.push({ role: 'assistant', text });
+      input.value = '';
+      syncComposerState();
+      activateSession(session.id);
+    }
+
+    historyList.addEventListener('click', (event) => {
+      const item = event.target.closest('.session-item');
+      if (!item) return;
+
+      const session = sessions.find((entry) => entry.id === item.dataset.sessionId);
+      if (!session) return;
+
+      const action = event.target.closest('[data-action]')?.dataset.action;
+      if (action === 'rename') {
+        renameSession(session);
+        return;
+      }
+      if (action === 'pin') {
+        togglePinSession(session);
+        return;
+      }
+      if (action === 'delete') {
+        deleteSession(session);
+        return;
+      }
+
+      activateSession(session.id);
+    });
+
+    newSessionButton.addEventListener('click', createNewSession);
+    sendButton.addEventListener('click', sendFakeMessage);
+    chatInner.addEventListener('click', (event) => {
+      const card = event.target.closest('.suggestion-card');
+      if (!card) return;
+
+      const question = card.querySelector('strong')?.textContent.trim();
+      if (!question) return;
+
+      input.value = question;
+      syncComposerState();
+      sendFakeMessage();
+    });
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendFakeMessage();
+      }
+    });
+
+    function syncComposerState() {
+      const hasValue = input.value.trim().length > 0;
+      sendButton.classList.toggle('is-ready', hasValue);
+      sendButton.disabled = !hasValue;
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 112) + 'px';
+    }
+
+    input.addEventListener('input', syncComposerState);
+    syncComposerState();
+    activeSessionId = sessions[0]?.id || '';
+    renderHistory();
+    if (activeSessionId) {
+      renderConversation(sessions[0]);
+    }
+  </script>
+</body>
+</html>
