@@ -1,9 +1,13 @@
-﻿param(
+param(
   [string]$ContainerName = "mom-data-agent-mysql",
-  [string]$Password = "root123456"
+  [string]$Password = $env:MYSQL_ROOT_PASSWORD
 )
 
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($Password)) {
+  Write-Error "MYSQL_ROOT_PASSWORD is required. Set the environment variable or pass -Password."
+}
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $schemaFile = Join-Path $scriptDir "001_mvp_schema.sql"
@@ -37,10 +41,12 @@ if ($LASTEXITCODE -ne 0) {
   Write-Error "Failed to copy verify SQL into container."
 }
 
-$command = "mysql -uroot --default-character-set=utf8mb4 < ${containerDir}/001_mvp_schema.sql && " +
-  "mysql -uroot --default-character-set=utf8mb4 mom_data_agent < ${containerDir}/002_mvp_seed_data.sql && " +
-  "mysql -uroot --default-character-set=utf8mb4 mom_data_agent < ${containerDir}/002_mvp_seed_data.sql && " +
-  "mysql -uroot --default-character-set=utf8mb4 mom_data_agent < ${containerDir}/003_mvp_verify.sql"
+$mysqlBaseCommand = "mysql -h127.0.0.1 -uroot --default-character-set=utf8mb4"
+$command = "set -e; " +
+  "$mysqlBaseCommand -e 'DROP DATABASE IF EXISTS mom_data_agent; CREATE DATABASE mom_data_agent;'; " +
+  "$mysqlBaseCommand mom_data_agent < ${containerDir}/001_mvp_schema.sql; " +
+  "$mysqlBaseCommand mom_data_agent < ${containerDir}/002_mvp_seed_data.sql; " +
+  "$mysqlBaseCommand mom_data_agent < ${containerDir}/003_mvp_verify.sql"
 
 docker exec -e MYSQL_PWD=$Password $ContainerName sh -c $command
 if ($LASTEXITCODE -ne 0) {
@@ -48,5 +54,3 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Docker MySQL verification finished."
-
-

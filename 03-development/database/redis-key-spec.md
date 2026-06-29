@@ -1,100 +1,225 @@
-﻿# MOM鏅鸿兘闂暟-MVP Redis Key 浣跨敤瑙勮寖
+﻿# MOM智能问数-MVP Redis Key 使用规范
 
-## 1. 瀹氫綅
+## 1. 定位
 
-Redis 鍙敤浜庣煭鏈熻繍琛屾€併€佺紦瀛樸€侀攣銆佸箓绛夈€侀檺娴佸拰浠诲姟杩涘害锛屼笉浣滀负浜嬪疄鏉ユ簮銆傛墍鏈夊叧閿暟鎹繀椤昏兘浠?MySQL 鎴栧閮ㄦ湇鍔℃仮澶嶃€?
-## 2. Key 鍛藉悕
+Redis 只用于短期运行态、缓存、锁、幂等、限流、SSE 事件缓冲和任务进度，不作为事实来源。所有关键数据必须能从 MySQL 或外部服务恢复。
 
-缁熶竴鏍煎紡锛?
+对齐口径：
+
+- 问数幂等键以接口文档为准：`sessionId + userMessageId`。
+- MySQL 是会话、消息、幂等台账、最终结果载荷和任务最终状态的事实来源。
+- Redis 不保存模型 API Key、ASR 密钥、数据源密码、完整连接串、外部 API Key。
+- MVP 不建设独立结果中心，不保存独立语音识别记录，不缓存访问 API 说明入口。
+
+## 2. Key 命名
+
+统一格式：
+
 ```text
 da:{module}:{purpose}:{id}
 ```
 
-绀轰緥锛?
+示例：
+
 ```text
-da:runtime:config:agent-mom-data
-da:chat:idempotent:session_xxx:client_msg_xxx
+da:runtime:config:default
+da:chat:idempotent:session_xxx:msg_user_xxx
 da:chat:lock:session_xxx
+da:stream:active:thread_xxx
+da:stream:stop:thread_xxx
 ```
 
 ## 3. P0 Key
 
-| Key | 绫诲瀷 | TTL | 鍐欏叆鏃舵満 | 璇诲彇鏃舵満 | 璇存槑 |
+| Key | 类型 | TTL | 写入时机 | 读取时机 | 说明 |
 | --- | --- | --- | --- | --- | --- |
-| `da:runtime:config:{agentId}` | String JSON | 5-10 鍒嗛挓 | 绠＄悊閰嶇疆鍙戝竷鍚庛€侀娆¤鍙栧悗 | 闂瓟鍓嶅姞杞借繍琛岄厤缃?| 缂撳瓨榛樿 Agent銆佹ā鍨嬨€佹暟鎹簮銆丼kill銆侀璁鹃棶棰樻憳瑕?|
-| `da:chat:idempotent:{sessionId}:{clientMessageId}` | String JSON | 24 灏忔椂 | 闂瓟鎴愬姛鎴栧け璐ヨ惤搴撳悗 | 鏀跺埌鍚屼竴 `clientMessageId` 鏃?| 闃叉鍓嶇閲嶈瘯瀵艰嚧閲嶅璋冪敤 |
-| `da:chat:lock:{sessionId}` | String | 90 绉?| 寮€濮嬪鐞嗛棶绛斿墠 | 澶勭悊闂瓟鍓?| 闃叉鍚屼竴浼氳瘽骞跺彂闂瓟锛岄暱鑰楁椂璇锋眰闇€瑕佺画鏈?|
+| `da:runtime:config:{agentId}` | String JSON | 5-10 分钟 | 管理配置保存、生效或首次读取后 | 问答前加载运行配置 | 缓存默认 Agent、模型、数据源、Skill、预设问题和语义配置摘要；不缓存敏感密钥 |
+| `da:chat:idempotent:{sessionId}:{userMessageId}` | String JSON | 24 小时 | Agent 回复消息进入终态并落库后 | SSE 重连、浏览器重试、重复点击发送时 | 防止同一用户消息重复创建 Agent 回复和重复调用模型/工具 |
+| `da:chat:lock:{sessionId}` | String | 90 秒 | 开始处理问答前 | 处理问答前 | 防止同一会话并发问答，长耗时请求需要续期 |
+| `da:stream:active:{threadId}` | String JSON | 90 秒 | SSE 问数任务启动后 | 暂停会话、断线恢复、运行态检查时 | 当前运行中的 SSE/Agent 任务状态，长耗时请求需要续期 |
+| `da:stream:stop:{threadId}` | String JSON | 10 分钟 | 用户点击暂停会话后 | Agent 执行链路检查暂停信号时 | 只表达暂停信号，最终 `STOPPED` 状态以 MySQL 为准 |
+| `da:stream:events:{threadId}` | Stream 或 List | 10 分钟 | SSE 事件发送前后 | 短期断线恢复 | 只缓存可下发给前端的安全事件，不缓存 SQL、Python、原始 HTML 等内部过程 |
 
 ## 4. P1 Key
 
-| Key | 绫诲瀷 | TTL | 鍐欏叆鏃舵満 | 璇诲彇鏃舵満 | 璇存槑 |
+| Key | 类型 | TTL | 写入时机 | 读取时机 | 说明 |
 | --- | --- | --- | --- | --- | --- |
-| `da:schema-task:{taskId}` | Hash 鎴?String JSON | 24 灏忔椂 | Schema 鍒濆鍖栦换鍔＄姸鎬佸彉鍖栨椂 | 鍓嶇杞浠诲姟杩涘害 | MySQL `da_schema_init_task` 淇濆瓨鏈€缁堢姸鎬?|
-| `da:vector-task:{taskId}` | Hash 鎴?String JSON | 24 灏忔椂 | 鐭ヨ瘑鍚戦噺鍖栦换鍔＄姸鎬佸彉鍖栨椂 | 鍓嶇杞浠诲姟杩涘害 | MySQL `da_vector_task` 淇濆瓨鏈€缁堢姸鎬?|
-| `da:api-key:{keyDigest}` | String JSON | 5-30 鍒嗛挓 | API Key 鏍￠獙鎴愬姛鍚?| 澶栭儴 API 閴存潈鏃?| 涓嶄繚瀛樺畬鏁?API Key |
-| `da:voice:{voiceRecordId}` | Hash 鎴?String JSON | 30 鍒嗛挓 | ASR 鐘舵€佸彉鍖栨椂 | 鍓嶇鏌ヨ璇煶璇嗗埆鐘舵€?| MySQL `da_voice_record` 淇濆瓨鏈€缁堢姸鎬?|
+| `da:rate:voice:{sessionId}:{clientIp}` | String/Counter | 1 分钟 | 调用 `POST /api/voice/asr` 前 | 语音识别限流判断时 | 语音识别成本控制；命中阈值后不调用 ASR 供应方 |
+| `da:schema-task:{taskId}` | Hash 或 String JSON | 24 小时 | Schema 初始化任务状态变化时 | 后端内部观测、日志排查和失败恢复 | MySQL `da_schema_init_task` 保存最终状态；MVP 不提供前端任务查询接口 |
+| `da:vector-task:{taskId}` | Hash 或 String JSON | 24 小时 | 知识向量化任务状态变化时 | 后端内部观测、日志排查和失败恢复 | MySQL `da_vector_task` 保存最终状态；MVP 不提供前端任务查询接口 |
 
-## 5. Value 寤鸿
+`clientIp` 来源规则：
 
-### 5.1 杩愯閰嶇疆缂撳瓨
+- 无可信代理时取请求 `remote address`。
+- 存在可信网关或反向代理时，仅从可信代理透传头解析真实 IP。
+- 未配置可信代理时不得直接信任 `X-Forwarded-For`、`X-Real-IP` 等客户端可伪造请求头。
+
+## 5. 后置 Key
+
+以下 Key 不纳入 MVP 开发和联调范围：
+
+| Key | 后置原因 |
+| --- | --- |
+| `da:api-docs:{agentId}` | 访问 API、`X-API-Key` 和外部调用说明在 MVP 阶段完全隐藏 |
+| `da:api-key:{apiKeyHash}` | 外部 API Key 生成、鉴权、启停和调用后置 |
+| `da:voice:{voiceRecordId}` | MVP 不保存独立语音识别记录，不保存原始音频 |
+| `da:result:{resultId}` | MVP 不建设独立结果中心，最终结果随 Agent 回复消息保存 |
+| `da:rate:user:{userId}` | MVP 不建设用户登录、注册和权限体系，用户级限流后置 |
+| `da:rate:tenant:{tenantId}` | MVP 不建设租户体系，租户级限流后置 |
+
+## 6. Value 建议
+
+### 6.1 运行配置缓存
 
 ```json
 {
-  "agentId": "agent-mom-data",
-  "configVersion": "2026-06-22T09:00:00.000+08:00",
+  "agentId": "default",
+  "configVersion": "2026-06-24T14:00:00.000+08:00",
   "llmModelConfigId": "model-llm-default",
   "embeddingModelConfigId": "model-embedding-default",
-  "asrModelConfigId": "model-asr-default",
   "datasourceId": "ds-mom-default",
   "enabledSkillCodes": ["WORK_ORDER_STATUS_STAT", "LOW_STOCK_QUERY", "EQUIPMENT_DOWNTIME_STAT"],
+  "semanticModelReady": true,
   "maxReturnRows": 1000,
   "queryTimeoutMs": 6000
 }
 ```
 
-### 5.2 闂瓟骞傜瓑缂撳瓨
+说明：
+
+- 本 Key 不保存模型 API Key、ASR 密钥、数据库密码和完整连接串。
+- 语音配置如需缓存，只能缓存 `enabled`、`language`、`maxDurationSeconds`、`maxFileSizeMb` 等非敏感摘要。
+
+### 6.2 问答幂等缓存
 
 ```json
 {
   "sessionId": "session_xxx",
-  "clientMessageId": "client_msg_xxx",
-  "traceId": "trace_xxx",
   "userMessageId": "msg_user_xxx",
   "agentMessageId": "msg_agent_xxx",
-  "resultId": "result_xxx",
-  "status": "SUCCESS",
-  "createdTime": "2026-06-22T09:00:00.000+08:00"
+  "threadId": "thread_xxx",
+  "traceId": "trace_xxx",
+  "messageStatus": "SUCCESS",
+  "resultPayloadStored": true,
+  "createdTime": "2026-06-24T14:00:00.000+08:00"
 }
 ```
 
-### 5.3 浼氳瘽閿?
-閿?value 蹇呴』鏄湰娆¤姹傜敓鎴愮殑闅忔満 token锛?
+说明：
+
+- 本 Key 只保存重试恢复所需的轻量索引，不保存完整大结果。
+- 完整最终结果以 MySQL 中 Agent 回复消息 `metadata_json.resultPayload` 为准。
+- `messageStatus` 可为 `SUCCESS`、`FAILED`、`STOPPED`。
+
+### 6.3 会话锁
+
+锁 value 必须是本次请求生成的随机 token：
+
 ```text
 trace_xxx:random_token_xxx
 ```
 
-閲婃斁閿佹椂蹇呴』鏍￠獙 value 涓€鑷达紝閬垮厤璇垹鍏朵粬璇锋眰鎸佹湁鐨勯攣銆?
-### 5.4 浠诲姟鐘舵€佺紦瀛?
+释放锁时必须校验 value 一致，避免误删其他请求持有的锁。
+
+### 6.4 当前运行任务
+
+```json
+{
+  "sessionId": "session_xxx",
+  "userMessageId": "msg_user_xxx",
+  "agentMessageId": "msg_agent_xxx",
+  "threadId": "thread_xxx",
+  "traceId": "trace_xxx",
+  "status": "PROCESSING",
+  "startedTime": "2026-06-24T14:00:00.000+08:00",
+  "lastHeartbeatTime": "2026-06-24T14:00:30.000+08:00"
+}
+```
+
+说明：
+
+- 任务运行期间需要续期。
+- 任务进入 `SUCCESS`、`FAILED`、`STOPPED` 终态并完成 MySQL 落库后，应删除或等待 TTL 过期。
+
+### 6.5 暂停信号
+
+```json
+{
+  "threadId": "thread_xxx",
+  "sessionId": "session_xxx",
+  "userMessageId": "msg_user_xxx",
+  "agentMessageId": "msg_agent_xxx",
+  "reason": "USER_STOP",
+  "createdTime": "2026-06-24T14:01:00.000+08:00"
+}
+```
+
+说明：
+
+- 暂停信号只要求 Agent 执行链路尽快中止当前任务。
+- 后端必须将 Agent 回复消息更新为 `STOPPED` 并保存已输出内容后，再向前端推送 `stopped` 事件。
+
+### 6.6 SSE 事件缓冲
+
+建议仅缓存短期可下发事件：
+
+```json
+{
+  "event": "message",
+  "sequence": 12,
+  "data": {
+    "agentMessageId": "msg_agent_xxx",
+    "textType": "MARKDOWN",
+    "content": "正在统计工单状态..."
+  },
+  "createdTime": "2026-06-24T14:00:10.000+08:00"
+}
+```
+
+约束：
+
+- 只缓存前端允许接收的 `message`、`complete`、`stopped`、`error` 等事件。
+- MVP 用户侧默认不缓存和回放 SQL、Python、原始 HTML 等内部过程。
+- `complete` 事件中的完整 `resultPayload` 可以短期缓存，但最终仍以 MySQL `metadata_json.resultPayload` 为准。
+
+### 6.7 任务状态缓存
+
 ```json
 {
   "taskId": "task_xxx",
   "taskStatus": "PROCESSING",
   "progress": 60,
-  "message": "姝ｅ湪瑙ｆ瀽鏁版嵁琛ㄥ瓧娈?,
-  "updatedTime": "2026-06-22T09:00:00.000+08:00"
+  "message": "正在解析数据表字段",
+  "updatedTime": "2026-06-24T14:00:00.000+08:00"
 }
 ```
 
-## 6. 骞傜瓑澶勭悊娴佺▼
+## 7. 幂等处理流程
 
-1. 鍚庣鏀跺埌 `sessionId + clientMessageId`锛屼袱鑰呭湪闂瓟涓婚摼璺腑閮藉繀椤诲瓨鍦ㄣ€?2. 鍏堣鍙?`da:chat:idempotent:{sessionId}:{clientMessageId}`銆?3. 濡傛灉 Redis 鍛戒腑锛岃繑鍥炵紦瀛樹腑鐨勬秷鎭拰缁撴灉鏍囪瘑锛屽啀鎸夐渶浠?MySQL 鏌ヨ瀹屾暣鍝嶅簲銆?4. 濡傛灉 Redis 鏈懡涓紝鏌ヨ MySQL 涓槸鍚﹀凡鏈夊悓涓€ `session_id + client_message_id` 鐨勭敤鎴锋秷鎭拰 Agent 鍥炲銆?5. 濡傛灉 MySQL 宸插瓨鍦ㄥ畬鏁寸粨鏋滐紝閲嶅缓 Redis 骞傜瓑缂撳瓨骞惰繑鍥烇紝閬垮厤 Redis 鍐欏け璐ュ悗閲嶈瘯閲嶅璋冪敤妯″瀷銆?6. 濡傛灉 Redis 鍜?MySQL 閮芥湭鍛戒腑锛屽皾璇曡幏鍙?`da:chat:lock:{sessionId}`銆?7. 鑾峰彇閿佸け璐ユ椂锛岃繑鍥炩€滃綋鍓嶄細璇濇鍦ㄥ鐞嗕腑鈥濓紝涓嶈皟鐢?LLM銆丷AG 鎴?MOM 鏌ヨ宸ュ叿銆?8. 鑾峰彇閿佹垚鍔熷悗鎵ц闂暟閾捐矾锛屽苟鍐欏叆 MySQL銆?9. MySQL 鍐欏叆鎴愬姛鍚庯紝鍐嶅啓鍏ュ箓绛夌紦瀛樸€?10. 璇锋眰缁撴潫鏃剁敤 value 鏍￠獙閲婃斁浼氳瘽閿併€?
-## 7. 閿佸疄鐜拌姹?
-鍔犻攣寤鸿锛?
+1. 用户点击发送后，后端先保存用户消息，返回 `userMessageId`。
+2. 前端使用同一个 `sessionId + userMessageId` 发起 `GET /api/stream/search`。
+3. 后端先读取 `da:chat:idempotent:{sessionId}:{userMessageId}`。
+4. 如果 Redis 命中，返回或复用缓存中的 `agentMessageId/threadId`，再按需从 MySQL 查询完整消息和最终结果。
+5. 如果 Redis 未命中，查询 MySQL `da_chat_request_ledger` 是否已有同一 `session_id + user_message_id`。
+6. 如果 MySQL 已有 `PROCESSING` 任务，复用已有 `agentMessageId/threadId`，不得重复创建 Agent 回复消息。
+7. 如果 MySQL 已有 `SUCCESS`、`FAILED`、`STOPPED` 终态，前端通过会话消息接口读取已落库结果，不重复执行问数。
+8. 如果 Redis 和 MySQL 都未命中，尝试获取 `da:chat:lock:{sessionId}`。
+9. 获取锁失败时，返回“当前会话正在处理中”，不调用 LLM、RAG 或 MOM 查询工具。
+10. 获取锁成功后，写入 `da_chat_request_ledger`，创建 Agent 回复消息，写入 `da:stream:active:{threadId}`，再执行问数链路。
+11. `complete/stopped/error` 终态事件发送前，后端必须先完成 MySQL 消息状态和最终结果落库。
+12. MySQL 落库成功后，再写入或刷新 `da:chat:idempotent:{sessionId}:{userMessageId}`。
+13. 请求结束时用 value 校验释放会话锁，并清理或等待运行态 Key 过期。
+
+## 8. 锁实现要求
+
+加锁建议：
+
 ```text
 SET da:chat:lock:{sessionId} {lockValue} NX PX 90000
 ```
 
-閲婃斁閿佸繀椤讳娇鐢?Lua 鏍￠獙锛?
+释放锁必须使用 Lua 校验：
+
 ```lua
 if redis.call("get", KEYS[1]) == ARGV[1] then
   return redis.call("del", KEYS[1])
@@ -103,7 +228,7 @@ else
 end
 ```
 
-闀胯€楁椂璇锋眰搴旀敮鎸侀攣缁湡銆傜画鏈熶篃蹇呴』鏍￠獙 value 涓€鑷达細
+长耗时请求应支持锁续期。续期也必须校验 value 一致：
 
 ```lua
 if redis.call("get", KEYS[1]) == ARGV[1] then
@@ -113,12 +238,41 @@ else
 end
 ```
 
-寤鸿绾︽潫锛?
-- 鍗曟閿?TTL 榛樿 90 绉掋€?- 鍚庣闂瓟鎬昏秴鏃朵笉搴旇秴杩?120 绉掋€?- 濡傛灉鎵ц瓒呰繃 60 绉掍粛鏈粨鏉燂紝鍙画鏈熶竴娆°€?- 缁湡澶辫触鏃跺簲鍋滄缁х画璋冪敤涓嬫父宸ュ叿锛屽苟杩斿洖鏈嶅姟绻佸繖鎴栬秴鏃舵彁绀恒€?
-## 8. 缂撳瓨涓€鑷存€?
-- 绠＄悊閰嶇疆淇濆瓨鎴栧彂甯冨悗锛屽簲鍒犻櫎 `da:runtime:config:{agentId}`銆?- 鍒犻櫎缂撳瓨澶辫触鏃朵笉褰卞搷閰嶇疆淇濆瓨锛屼絾蹇呴』璁板綍鏃ュ織銆?- 闂瓟閾捐矾璇诲彇閰嶇疆鏃讹紝濡傛灉缂撳瓨鏈懡涓紝搴斾粠 MySQL 閲嶆柊鏋勫缓銆?- Redis 涓换鍔＄姸鎬佸彧鐢ㄤ簬蹇€熸煡璇紝浠诲姟鏈€缁堢姸鎬佷互 MySQL 涓哄噯銆?
-## 9. 瀹夊叏瑕佹眰
+建议约束：
 
-- Redis 涓嶄繚瀛樻ā鍨?API Key 鏄庢枃銆?- Redis 涓嶄繚瀛樻暟鎹簮瀵嗙爜銆佸畬鏁磋繛鎺ヤ覆銆佸畬鏁村閮?API Key銆?- API Key 閴存潈缂撳瓨鍙繚瀛?`keyDigest`銆乣agentId`銆佹潈闄愭憳瑕佸拰鍚敤鐘舵€併€?- 闂鍘熸枃鍘熷垯涓婁笉杩涘叆瀹¤绫?Redis Key锛涘纭渶缂撳瓨锛屽簲鍏堣劚鏁忋€?
-## 10. 寮€鍙戦獙鏀舵竻鍗?
-- 鍚屼竴 `sessionId + clientMessageId` 閲嶈瘯涓嶄細閲嶅鍒涘缓鐢ㄦ埛娑堟伅鍜?Agent 娑堟伅銆?- 鍚屼竴浼氳瘽骞跺彂鎻愪氦鏃讹紝鍙湁涓€涓姹傝繘鍏ラ棶鏁颁富閾捐矾銆?- 鍒犻櫎杩愯閰嶇疆缂撳瓨鍚庯紝涓嬩竴娆￠棶绛旇兘浠?MySQL 閲嶅缓閰嶇疆銆?- 浠诲姟鐘舵€?Redis 杩囨湡鍚庯紝鍓嶇浠嶅彲浠?MySQL 鏌ヨ鏈€缁堜换鍔＄姸鎬併€?- 閿侀噴鏀鹃€昏緫涓嶄細鍒犻櫎鍏朵粬璇锋眰鎸佹湁鐨勯攣銆?
+- 单次锁 TTL 默认 90 秒。
+- 后端问答总超时不应超过接口文档约定的问数超时。
+- 如果执行超过 60 秒仍未结束，可续期一次或按后端任务策略持续续期。
+- 续期失败时应停止继续调用下游工具，并返回服务繁忙或超时提示。
+
+## 9. 缓存一致性
+
+- 管理配置保存、生效、启停或删除后，应删除 `da:runtime:config:{agentId}`。
+- 删除缓存失败时不影响配置保存，但必须记录日志。
+- 问答链路读取配置时，如果缓存未命中，应从 MySQL 重新构建。
+- Redis 中任务状态只用于后端内部观测、日志排查和失败恢复，任务最终状态以 MySQL 为准。
+- Redis 幂等缓存写入失败不应导致 MySQL 已落库结果丢失；后续重试可从 MySQL 重建缓存。
+
+## 10. 安全要求
+
+- Redis 不保存模型 API Key 明文。
+- Redis 不保存 ASR API Key、Secret Key、原始音频或独立识别记录。
+- Redis 不保存数据源密码、完整连接串、完整外部 API Key。
+- 外部 API Key 鉴权缓存后置；MVP Redis 不保存外部 API Key 摘要、脱敏值或鉴权结果。
+- 用户级、租户级限流 Key 后置；MVP 仅确认语音识别限流 `da:rate:voice:{sessionId}:{clientIp}`。
+- 问题原文原则上不进入审计类 Redis Key；如确需缓存，应先脱敏。
+- SSE 事件缓冲不得缓存后端堆栈、数据库密码、密钥、原始 SQL 执行细节和不可下发的内部过程。
+
+## 11. 开发验收清单
+
+- 同一 `sessionId + userMessageId` 重试不会重复创建 Agent 回复消息。
+- 同一 `sessionId + userMessageId` 终态后不会重复调用 LLM、RAG 或 MOM 查询工具。
+- 同一会话并发提交时，只有一个请求进入问数主链路。
+- 暂停会话会写入 `da:stream:stop:{threadId}`，并最终落库为 `STOPPED`。
+- `complete/stopped/error` 终态事件发送前，MySQL 已保存消息状态和最终结果载荷。
+- 删除运行配置缓存后，下一次问答能从 MySQL 重建配置。
+- 任务状态 Redis 过期后，不影响 Schema 初始化或向量化任务的最终状态落库。
+- 锁释放逻辑不会删除其他请求持有的锁。
+- Redis 中不存在 `da:api-docs:{agentId}`、`da:voice:{voiceRecordId}`、`da:result:{resultId}`、`da:rate:user:{userId}`、`da:rate:tenant:{tenantId}` 等 MVP 后置 Key。
+
+

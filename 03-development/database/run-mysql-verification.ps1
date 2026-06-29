@@ -1,4 +1,4 @@
-﻿param(
+param(
   [string]$HostName = "127.0.0.1",
   [int]$Port = 3306,
   [string]$User = "root",
@@ -51,7 +51,6 @@ try {
   $parts = @($schemaFile)
   if (-not $SkipSeed) {
     $parts += $seedFile
-    $parts += $seedFile
   }
   $parts += $verifyFile
 
@@ -68,7 +67,7 @@ try {
     Write-Error "Database verification failed with exit code $LASTEXITCODE."
   }
 
-  Write-Host "Verification finished. Review output: table count should be 22 and required tables should be OK."
+  Write-Host "Verification finished. Review output: table count should be 19 and required tables should be OK."
 }
 finally {
   [Environment]::SetEnvironmentVariable("MYSQL_PWD", $previousMysqlPwd, "Process")
@@ -76,4 +75,3 @@ finally {
     Remove-Item -LiteralPath $combinedFile -Force
   }
 }
-

@@ -1,10 +1,10 @@
-﻿services:
+services:
   mysql:
     image: mysql:8.0
     container_name: mom-data-agent-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD before starting MySQL}
       MYSQL_DATABASE: mom_data_agent
       TZ: Asia/Shanghai
     command:
@@ -16,12 +16,11 @@
     volumes:
       - mom_data_agent_mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot123456"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
       timeout: 3s
       retries: 20
 
 volumes:
   mom_data_agent_mysql_data:
-
 
